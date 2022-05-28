@@ -1,6 +1,7 @@
 import numpy as np
 from numpy import array
 from scipy.special import erf
+from scipy.integrate import quad
 from random import uniform
 from math import ceil, factorial
 
@@ -36,7 +37,7 @@ def sampler(x: array, pdf_x: array) -> array:
     '''
     temp = array([])
     for i in range(len(pdf_x)):
-        temp = np.append(temp, uniform_distribution(ceil(pdf_x[i]), 0, x[i]))
+        temp = np.append(temp, uniform_distribution(ceil(len(x)*pdf_x[i]), 0, x[i]))
 
     if len(temp) < len(x):
         temp = np.append(temp, uniform_distribution(len(x)-len(temp), min(x), max(x)))
@@ -56,7 +57,25 @@ def gaussian(x: float, mu: float, sigma: float) -> float:
             P(x|mu, sigma) (float): Probability value for x, sigma, and mu
                     
     '''
-    return (np.exp(((-(x - mu)**2)/ 2 * sigma**2))/ sigma * (2*np.pi)**(1/2))
+    return (np.exp(((-(x - mu)**2)/ (2 * (sigma**2)))))/ (sigma * (2*np.pi)**(1/2))
+
+def cdf(pdf, x: array, args: tuple) -> array:
+    '''
+    Generates the cumulative distribution function for a given probability distribution function
+
+        Parameters:
+            pdf (function): probability distribution function;
+            x (array): domain of calculation;
+            args (list): list of parameters for the given distribution.
+
+        Returns:
+            cdf (array): cumulative distribution function.
+    '''
+    temp = ([])
+    for i in x:
+        temp = np.append(temp, quad(pdf, x[0], i, args)[0])
+
+    return temp/max(temp)
 
 def gaussian_distribution(x: array, mu: float, sigma: float) -> array:
     '''
@@ -88,11 +107,14 @@ def some_random_function(x: float, x_0: float, sigma: float) -> float:
         Returns:
             w_f (float): value of given expression.
     '''
-    sec1 = (np.exp(((-(x - x_0)**2)/ 2 * sigma**2))/ sigma * (2*np.pi)**(1/2))
-    sec2 = (np.exp(((-(x + x_0)**2)/ 2 * sigma**2))/ sigma * (2*np.pi)**(1/2))
-    sec3 = (erf(x_0/(sigma * (2*np.pi)**(1/2))))**(-1)
+    denominator1 = 2 * (sigma**2)
+    denominator2  = (sigma * ((2*np.pi)**(1/2)))
 
-    return (sec1 - sec2)*(sec3)
+    sec1 = (np.exp((-(x - x_0)**2)/ denominator1)/ denominator2)
+    sec2 = (np.exp((-(x + x_0)**2)/ denominator1)/ denominator2)
+    sec3 = (erf(x_0/ denominator2))
+
+    return (sec1 - sec2)/(sec3)
 
 def skewed_distribution(x: array, x_0: float, sigma: float) -> array:
     '''

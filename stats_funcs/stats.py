@@ -1,5 +1,5 @@
 import numpy as np
-from numpy import array, var
+from numpy import array
 
 def mean(x: array) -> float:
     '''
@@ -31,29 +31,13 @@ def variance(x: array, unbiased: bool = True) -> float:
     else:
         return sum((x - _x)**2)/len(x)
 
-def skewness(x: array) -> float:
-    '''
-    Calculates the skewness of a sample
+##CAN NOT MAKE THESE TWO STATISTICS MATCH THE ONE FROM SCIPY!!  (ノಠ益ಠ)ノ彡┻━┻
 
-        Parameters:
-            x (array): sample.
+# def skew(x: array) -> float:
+#     return sum((x - mean(x))**3)/(len(x)*(variance(x)**3))
 
-        Returns:
-            g (float): skewness of the sample.
-    '''
-    return sum((x - mean(x))**3)/(len(x)*(variance(x)**3))
-
-def kurtosis(x: array) -> float:
-    '''
-    Calculates the kurtosis of a sample
-
-        Parameters:
-            x (array): sample.
-
-        Returns:
-            k (float): kurtosis of the sample.
-    '''
-    return sum((x - mean(x))**4)/(len(x)*(variance(x)**4)) - 3
+# def kurtosis(x: array) -> float:
+#     return sum((x - mean(x))**4)/(len(x)*(variance(x)**4)) - 3
 
 def covariance(x: array, y: array) -> float:
     '''
