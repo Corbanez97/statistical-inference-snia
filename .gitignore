@@ -1,2 +1,4 @@
-.ipynb_checkpoints
+**/*.ipynb_checkpoints
+**/*.cpython-310..pyc
 Temp.ipynb
+
