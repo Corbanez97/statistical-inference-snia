@@ -70,6 +70,25 @@ def gaussian(x: float, mu: float, sigma: float) -> float:
     '''
     return (np.exp(((-(x - mu)**2)/ (2 * (sigma**2)))))/ (sigma * (2*np.pi)**(1/2))
 
+def gaussian2d(x: float, mux: float, sigmax: float, y: float, muy: float, sigmay: float, rho: float) -> float:
+    '''
+    Calculate the value of the gaussian function given its parameters
+    
+        Parameters: 
+            x (float): value of sample;
+            mu (float) and sigma (float): constants.
+            
+        Returns:
+            P(x|mu, sigma) (float): Probability value for x, sigma, and mu
+                    
+    '''
+    x_dot = (x - mux)/sigmax
+    y_dot = (y - muy)/sigmay
+    rho_dot = 1 - (rho**2)
+    exp_arg = -(1/(2*rho_dot))*(x_dot**2 + y_dot**2 - 2*rho*x_dot*y_dot)
+    denominator = sigmax * sigmay * 2 * np.pi * np.sqrt(rho_dot)
+    return np.exp(exp_arg)/denominator
+
 def cdf(pdf, x: array, args: tuple) -> array:
     '''
     Generates the cumulative distribution function for a given probability distribution function
