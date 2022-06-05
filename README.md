@@ -43,7 +43,7 @@ This repository currently has:
 
 ![Central Limit](images/1024_multivariate_gaussian.png)
 
-![Interpolation](images/interpolated point.png)
+![Interpolation](images/interpolated_point.png)
 
 
 ## Setup
