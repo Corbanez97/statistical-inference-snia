@@ -75,7 +75,7 @@ if __name__ == '__main__':
         dict_kwargs = {'df': df, 'chi2null': chi2null}
 
         if sys.argv[2] == 'single':
-            print('Using singleprocessin method')
+            print('Using singleprocessing method')
             results = []
             for params in generate_grid(np.linspace(0, 1, grid_size), np.linspace(0, 1, grid_size), [71]):
                 results.append(myfunc(params, **dict_kwargs))
