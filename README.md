@@ -23,7 +23,7 @@ This is an introductory course in statistics and data analysis. All you need to 
 
 The `Practical Data Analysis.ipynb` notebook contains a compendium of information on statistics. From basic definitions to complex theorems. This main notebook is divided into lessons. If needed, another notebook or document will be listed for further studies (`Sampler.ipynb` and `usefull_proofs.xopp` for instance). 
 
-Furthermore, there are some practice exercises for each lesson. The solutions for these exercises are presented in the `Assigment.ipynb`.
+Furthermore, there are some practice exercises for each lesson. The solutions for these exercises are presented in the `Assigment1.ipynb` and `Supernovae.ipynb`.
 
 
 ## Technologies Used
