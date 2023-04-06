@@ -55,3 +55,10 @@ INFO:root:Saving calculation in the file 200_Hubble_Omega_l_likelihood_ratio.jso
 INFO:root:Execution 2023-04-05 23:03:58.155094
 INFO:root:Script running with following configuration: {'mode': 'multi', 'sample_path': 'data/snls_snia.json', 'free': ['Hubble', 'Omega_l'], 'grid': {'Hubble': [0, 100], 'Omega_l': [0, 1]}, 'grid_sizes': [400]}
 INFO:root:Maximum Likelihood Estimators: [ 0.73654492  0.26206903 70.11226543]
+INFO:root:Grid with length 400 calculated in 452.0865468978882 seconds
+INFO:root:Saving calculation in the file 400_Hubble_Omega_l_likelihood_ratio.json
+INFO:root:Execution 2023-04-05 23:13:42.700253
+INFO:root:Script running with following configuration: {'mode': 'multi', 'sample_path': 'data/snls_snia.json', 'free': ['Hubble', 'Omega_l'], 'grid': {'Hubble': [63, 77], 'Omega_l': [0.55, 0.97]}, 'grid_sizes': [400]}
+INFO:root:Maximum Likelihood Estimators: [ 0.73654492  0.26206903 70.11226543]
+INFO:root:Grid with length 400 calculated in 409.7042260169983 seconds
+INFO:root:Saving calculation in the file 400_Hubble_Omega_l_likelihood_ratio.json
