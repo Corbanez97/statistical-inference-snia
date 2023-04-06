@@ -11,7 +11,6 @@ from datetime import datetime
 
 import json
 import logging
-import pickle
 import sys
 
 def Dc(z, params):
@@ -78,13 +77,11 @@ def orchestrator(params, **kwargs):
     
 if __name__ == '__main__':
 
-    sub = {}
-    out = {}
-
     logging.basicConfig(filename="log/likelihood_ratio.log", level=logging.INFO)
+    logging.info(f'Execution {datetime.today()}')
 
     config = json.load(open(sys.argv[1]))
-    logging.info(f'Execution {datetime.today()}')
+
     logging.info(f'Script running with following configuration: {config}')
 
     sample = json.load(open(config['sample_path']))
@@ -118,15 +115,16 @@ if __name__ == '__main__':
                 pool.join()
 
         end = time.time()
-
-        sub['result'] = results
-        sub['time'] = end - start
-
+        file_name = str(grid_size) + '_' +  config['free'][0] + '_' + config['free'][1] + '_' + 'likelihood_ratio.json'
         logging.info(f'Grid with length {grid_size} calculated in {end-start} seconds')
-        
-        out[grid_size] = sub
+        logging.info(f'Saving calculation in the file {file_name}')
 
-    with open('data/' + config['mode'] + 'processing_log_test.pickle', 'wb') as handle:
-        pickle.dump(out, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        out = {'Omega_l': np.array(list(np.array(results)[:,0]))[:,0].tolist(),
+               'Omega_m': np.array(list(np.array(results)[:,0]))[:,0].tolist(),
+               'Hubble': np.array(list(np.array(results)[:,0]))[:,2].tolist(),
+               'Ratio': np.array(results)[:,1].tolist()}
+
+        with open('data/' + file_name, 'w') as out_file:
+            json.dump(out, out_file)
     
     
