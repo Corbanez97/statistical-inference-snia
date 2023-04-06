@@ -7,8 +7,10 @@ from scipy.optimize import minimize
 from multiprocessing import Pool
 from functools import partial
 import time
+from datetime import datetime
 
 import json
+import logging
 import pickle
 import sys
 
@@ -48,41 +50,70 @@ def generate_grid(x, y, z):
             for k in z:
                 yield (i, j, k)
 
+def free_params_parser(config, grid_size):
+    if "Hubble" not in config['free']:
+        _grid = generate_grid(
+            np.linspace(config['grid']['Omega_l'][0], config['grid']['Omega_l'][1], grid_size), 
+            np.linspace(config['grid']['Omega_m'][0], config['grid']['Omega_m'][1], grid_size), 
+            [config['minimum'][2]],
+        )
+        return _grid
+    elif "Omega_l" not in config['free']:
+        _grid = generate_grid(
+            [config['minimum'][0]], 
+            np.linspace(config['grid']['Omega_m'][0], config['grid']['Omega_m'][1], grid_size), 
+            np.linspace(config['grid']['Hubble'][0], config['grid']['Hubble'][1], grid_size),
+        )
+        return _grid
+    elif "Omega_m" not in config['free']:
+        _grid = generate_grid(
+            np.linspace(config['grid']['Omega_l'][0], config['grid']['Omega_l'][1], grid_size),
+            [config['minimum'][1]],
+            np.linspace(config['grid']['Hubble'][0], config['grid']['Hubble'][1], grid_size),
+        )
+        return _grid
+
 def orchestrator(params, **kwargs):
     return params, ratio(params, kwargs['df'], kwargs['chi2null'])
     
 if __name__ == '__main__':
 
-    log = {}
-
     sub = {}
+    out = {}
 
-    sample = json.load(open('../data/snls_snia.json'))
+    logging.basicConfig(filename="log/likelihood_ratio.log", level=logging.INFO)
+
+    config = json.load(open(sys.argv[1]))
+    logging.info(f'Execution {datetime.today()}')
+    logging.info(f'Script running with following configuration: {config}')
+
+    sample = json.load(open(config['sample_path']))
 
     df = pd.DataFrame(sample)
 
     x0 = [0.75, 0.25, 71] # params = [Omega Lambda, Omega Matter, Hubble's Constant, Omega Curvature, Omega Radiation]
 
     minimum = minimize(chi2, x0 = x0, args = (df), method = 'Nelder-Mead', tol = 1e-6, bounds = ((0,1), (0,1), (0, None)))
-    chi2null = chi2(minimum.x, df)
+    config['minimum'] = minimum.x
+    logging.info(f'Maximum Likelihood Estimators: {minimum.x}')
 
+
+    chi2null = chi2(minimum.x, df)
     dict_kwargs = {'df': df, 'chi2null': chi2null}
 
-    sizes = map(int, sys.argv[1].strip('[]').split(','))
-    for grid_size in sizes:
+    for grid_size in config['grid_sizes']:
 
         start = time.time()
 
-        if sys.argv[2] == 'single':
-            print('Using singleprocessing method')
+        if config['mode'] == 'single':
             results = []
-            for params in generate_grid(np.linspace(0, 1, grid_size), np.linspace(0, 1, grid_size), [71]):
+            #for params in generate_grid(np.linspace(0, 1, grid_size), np.linspace(0, 1, grid_size), [71]):
+            for params in free_params_parser(config, grid_size):
                 results.append(orchestrator(params, **dict_kwargs))
-        elif sys.argv[2] == 'multi':
-            print('Using multiprocessing method')
+        elif config['mode'] == 'multi':
             with Pool() as pool:
-                results = pool.map(partial(orchestrator, **dict_kwargs), generate_grid(np.linspace(0, 1, grid_size), np.linspace(0, 1, grid_size), [71])
-                ) 
+                #results = pool.map(partial(orchestrator, **dict_kwargs), generate_grid(np.linspace(0, 1, grid_size), np.linspace(0, 1, grid_size), [71]))
+                results = pool.map(partial(orchestrator, **dict_kwargs), free_params_parser(config, grid_size))
                 pool.close()
                 pool.join()
 
@@ -90,10 +121,12 @@ if __name__ == '__main__':
 
         sub['result'] = results
         sub['time'] = end - start
-        
-        log[grid_size] = sub
 
-    with open(f'../data/{sys.argv[2]}processing_log.pickle', 'wb') as handle:
-        pickle.dump(log, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        logging.info(f'Grid with length {grid_size} calculated in {end-start} seconds')
+        
+        out[grid_size] = sub
+
+    with open('data/' + config['mode'] + 'processing_log_test.pickle', 'wb') as handle:
+        pickle.dump(out, handle, protocol=pickle.HIGHEST_PROTOCOL)
     
     
