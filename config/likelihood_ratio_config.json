@@ -1,7 +1,7 @@
 {
   "mode": "multi",
   "sample_path": "data/snls_snia.json",
-  "free": ["Hubble", "Omega_l"],
-  "grid": {"Hubble": [50, 100], "Omega_l": [0.50, 1]},
+  "free": ["Omega_m", "Hubble"],
+  "grid": {"Omega_m": [0.1, 5], "Hubble": [55, 88]},
   "grid_sizes": [400]
 }
