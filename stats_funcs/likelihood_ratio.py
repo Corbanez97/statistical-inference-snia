@@ -14,9 +14,14 @@ import logging
 import sys
 
 def Dc(z, params):
-    def f(z, a, b):
-        return (np.sqrt(a + b*(1 + z)**3))**(-1)
-    return quad(f, 0, z, args = (params[0], params[1]))[0]
+    if len(params) == 3:
+        def f(z, a, b):
+            return (np.sqrt(a + b*(1 + z)**3))**(-1)
+        return quad(f, 0, z, args = (params[0], params[1]))[0]
+    else:
+        def f(z, params):
+            return (np.sqrt(params[0] + params[1]*(1 + z)**3 + params[3]*(1 + z)**2 + params[4]*(1 + z)**4))**(-1)
+        return quad(f, 0, z, args = params)[0]
 
 def Dt(z, params):
     if len(params) == 3:
@@ -88,7 +93,9 @@ if __name__ == '__main__':
 
     df = pd.DataFrame(sample)
 
-    x0 = [0.75, 0.25, 71] # params = [Omega Lambda, Omega Matter, Hubble's Constant, Omega Curvature, Omega Radiation]
+    # minimize for each iteration
+
+    x0 = [0.75, 0.25, 71] # params = [Omega Lambda, Omega Matter, Hubble's Constant, Omega Curvature, Omega Radiation] #w
 
     minimum = minimize(chi2, x0 = x0, args = (df), method = 'Nelder-Mead', tol = 1e-6, bounds = ((0,1), (0,1), (0, None)))
     config['minimum'] = minimum.x
@@ -119,8 +126,9 @@ if __name__ == '__main__':
         logging.info(f'Grid with length {grid_size} calculated in {end-start} seconds')
         logging.info(f'Saving calculation in the file {file_name}')
 
+        # Brace yourself for some terrible coding!!! ლ(ಠ益ಠლ)
         out = {'Omega_l': np.array(list(np.array(results)[:,0]))[:,0].tolist(),
-               'Omega_m': np.array(list(np.array(results)[:,0]))[:,0].tolist(),
+               'Omega_m': np.array(list(np.array(results)[:,0]))[:,1].tolist(),
                'Hubble': np.array(list(np.array(results)[:,0]))[:,2].tolist(),
                'Ratio': np.array(results)[:,1].tolist()}
 
