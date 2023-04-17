@@ -13,72 +13,89 @@ import json
 import logging
 import sys
 
-def Dc(z, params):
-    if len(params) == 3:
-        def f(z, a, b):
-            return (np.sqrt(a + b*(1 + z)**3))**(-1)
-        return quad(f, 0, z, args = (params[0], params[1]))[0]
-    else:
-        def f(z, params):
-            return (np.sqrt(params[0] + params[1]*(1 + z)**3 + params[3]*(1 + z)**2 + params[4]*(1 + z)**4))**(-1)
-        return quad(f, 0, z, args = params)[0]
+"""
+params = [Omega Lambda, Omega Matter, Hubble's Constant, Omega Curvature, Omega Radiation, w]
+"""
 
-def Dt(z, params):
-    if len(params) == 3:
-        return Dc(z, params)
-    else:
-        return np.sinh(np.sqrt(params[3])*Dc(z, params))/np.sqrt(params[3])
+def Dc(z, Omega_l, Omega_m, Omega_k, w):
+    def f(z, Omega_l, Omega_m, Omega_k, w):
+        return (np.sqrt(Omega_l*(1 + z)**(-3 - 3*w) + Omega_m*(1 + z)**3 + Omega_k*(1 + z)**2 + 9.2e-5*(1 + z)**4))**(-1)
+    return quad(f, 0, z, args = (Omega_l, Omega_m, Omega_k, w))[0]
 
-def Dl(z, params):
-    return (1 + z) * Dt(z, params)
+def Dt(z, Omega_l, Omega_m, Omega_k, w):
+    if Omega_k > 0:
+        return np.sin(np.sqrt(Omega_k)*Dc(z, Omega_l, Omega_m, Omega_k, w))/np.sqrt(Omega_k)
+    elif Omega_k == 0:
+        return Dc(z, Omega_l, Omega_m, Omega_k, w)
+    elif Omega_k:
+        return np.sinh(np.sqrt(abs(Omega_k))*Dc(z, Omega_l, Omega_m, Omega_k, w))/np.sqrt(abs(Omega_k))
+
+def Dl(z, Omega_l, Omega_m, Omega_k, w):
+    return (1 + z) * Dt(z, Omega_l, Omega_m, Omega_k, w)
                
-def mu(z, params):
+def mu(z, Omega_l, Omega_m, Omega_k, w, Hubble):
     c = 3e5 #(km/s)
-    return 5*np.log10(Dl(z, params)) + 25 + 5*np.log10(c/ params[2])
+    return 5*np.log10(Dl(z, Omega_l, Omega_m, Omega_k, w)) + 25 + 5*np.log10(c/ Hubble)
 
-def chi2_i(mu_o, sigma_o, z_obs, params):
-    return ((mu(z_obs, params) - mu_o)**2)/sigma_o**2
+def chi2_i(mu_o, sigma_o, z_obs, Omega_l, Omega_m, Omega_k, w, Hubble):
+    return ((mu(z_obs, Omega_l, Omega_m, Omega_k, w, Hubble) - mu_o)**2)/sigma_o**2
 
-def chi2(params, df): 
+def chi2(Omega_l, Omega_m, Omega_k, w, Hubble, df): 
     values = []
     for idx in df.index:
-        values.append(chi2_i(df.mu[idx], df.sigma[idx], df.z[idx], params))
+        values.append(chi2_i(df.mu[idx], df.sigma[idx], df.z[idx], Omega_l, Omega_m, Omega_k, w, Hubble))
     return sum(values)
 
-def ratio(params, df, chi2null):
-    return chi2(params, df) - chi2null
+def ratio(Omega_l, Omega_m, Omega_k, w, Hubble, df, chi2null):
+    return chi2(Omega_l, Omega_m, Omega_k, w, Hubble, df) - chi2null
 
-def generate_grid(x, y, z):
-    for i in x:
-        for j in y:
-            for k in z:
-                yield (i, j, k)
+def _zip_vars(fixed: dict, x) -> dict:
+    full_parameters = ['Omega_l', 'Omega_m', 'Omega_k', 'w',  'Hubble']
+    variable_parameters = []
+    for param in full_parameters:
+        if param not in list(fixed.keys()):
+            variable_parameters.append(param)
+            
+    _vars = dict(zip(variable_parameters, x))
+    return _vars
 
-def free_params_parser(config, grid_size):
-    if "Hubble" not in config['free']:
-        _grid = generate_grid(
-            np.linspace(config['grid']['Omega_l'][0], config['grid']['Omega_l'][1], grid_size), 
-            np.linspace(config['grid']['Omega_m'][0], config['grid']['Omega_m'][1], grid_size), 
-            [config['minimum'][2]],
-        )
-        return _grid
-    elif "Omega_l" not in config['free']:
-        _grid = generate_grid(
-            [config['minimum'][0]], 
-            np.linspace(config['grid']['Omega_m'][0], config['grid']['Omega_m'][1], grid_size), 
-            np.linspace(config['grid']['Hubble'][0], config['grid']['Hubble'][1], grid_size),
-        )
-        return _grid
-    elif "Omega_m" not in config['free']:
-        _grid = generate_grid(
-            np.linspace(config['grid']['Omega_l'][0], config['grid']['Omega_l'][1], grid_size),
-            [config['minimum'][1]],
-            np.linspace(config['grid']['Hubble'][0], config['grid']['Hubble'][1], grid_size),
-        )
-        return _grid
+def h(x, fixed, df):
+    """
+    This is a wrapper for the chi2 function. 
+    A workaround to the fact that scipy.optimize.minimize uses positional arguments
+    
+        Given a dict of fixed variables, this fuction enables minimize to pass an array of arguments
+    """
+    
+     # Creates dictionary of variables to be optimized
+    _vars = _zip_vars(fixed, x)
+
+    # fixed['df'] = df
+    g = partial(chi2, df = df, **fixed) # Creates partial function fixing variables set by `fixed`
+        
+    # Unzips `_vars` as named args to `g`
+    return g(**_vars) 
+
+def generate_grid(config, grid_size):
+    fixed = {}
+    x0 = config['minimization_seed']
+    for i in np.linspace(config['grid'][config['free'][0]][0], config['grid'][config['free'][0]][1], grid_size):
+        fixed[config['free'][0]] = i
+        for j in np.linspace(config['grid'][config['free'][1]][0], config['grid'][config['free'][1]][1], grid_size):
+            fixed[config['free'][1]] = j
+            
+            minimum = minimize(h, x0 = x0, args = (fixed, config['df']), method = 'Nelder-Mead', tol = 1e-6)
+            x0 = minimum.x
+            
+            _vars = _zip_vars(fixed, minimum.x)
+            
+            keys = ['Omega_l', 'Omega_m', 'Omega_k', 'w', 'Hubble']
+            values = [fixed.get(key,  _vars.get(key)) for key in keys]
+            print(f'Set of parameters to calculate ratio: {values}')
+            yield tuple(values)
 
 def orchestrator(params, **kwargs):
-    return params, ratio(params, kwargs['df'], kwargs['chi2null'])
+    return params, ratio(params[0], params[1], params[2], params[3], params[4], kwargs['df'], kwargs['chi2null'])
     
 if __name__ == '__main__':
 
@@ -92,17 +109,17 @@ if __name__ == '__main__':
     sample = json.load(open(config['sample_path']))
 
     df = pd.DataFrame(sample)
+    config['df'] = df
+    fixed = {}
 
-    # minimize for each iteration
+    x0 = [0.76, 0.24, 0.02, -1, 71] #['Omega_l', 'Omega_m', 'Omega_k', 'w',  'Hubble']
 
-    x0 = [0.75, 0.25, 71] # params = [Omega Lambda, Omega Matter, Hubble's Constant, Omega Curvature, Omega Radiation] #w
-
-    minimum = minimize(chi2, x0 = x0, args = (df), method = 'Nelder-Mead', tol = 1e-6, bounds = ((0,1), (0,1), (0, None)))
-    config['minimum'] = minimum.x
-    logging.info(f'Maximum Likelihood Estimators: {minimum.x}')
+    null = minimize(h, x0 = x0, args = (fixed, df), method = 'Nelder-Mead', tol = 1e-6, options = {'maxiter': 10000})
+    config['minimum'] = null.x
+    logging.info(f'Maximum Likelihood Estimators: {null.x}')
 
 
-    chi2null = chi2(minimum.x, df)
+    chi2null = chi2(null.x[0], null.x[1], null.x[2], null.x[3], null.x[4], df)
     dict_kwargs = {'df': df, 'chi2null': chi2null}
 
     for grid_size in config['grid_sizes']:
@@ -112,12 +129,12 @@ if __name__ == '__main__':
         if config['mode'] == 'single':
             results = []
             #for params in generate_grid(np.linspace(0, 1, grid_size), np.linspace(0, 1, grid_size), [71]):
-            for params in free_params_parser(config, grid_size):
+            for params in generate_grid(config, grid_size):
                 results.append(orchestrator(params, **dict_kwargs))
         elif config['mode'] == 'multi':
             with Pool() as pool:
                 #results = pool.map(partial(orchestrator, **dict_kwargs), generate_grid(np.linspace(0, 1, grid_size), np.linspace(0, 1, grid_size), [71]))
-                results = pool.map(partial(orchestrator, **dict_kwargs), free_params_parser(config, grid_size))
+                results = pool.map(partial(orchestrator, **dict_kwargs), generate_grid(config, grid_size))
                 pool.close()
                 pool.join()
 
@@ -129,7 +146,9 @@ if __name__ == '__main__':
         # Brace yourself for some terrible coding!!! ლ(ಠ益ಠლ)
         out = {'Omega_l': np.array(list(np.array(results)[:,0]))[:,0].tolist(),
                'Omega_m': np.array(list(np.array(results)[:,0]))[:,1].tolist(),
-               'Hubble': np.array(list(np.array(results)[:,0]))[:,2].tolist(),
+               'Omega_k': np.array(list(np.array(results)[:,0]))[:,2].tolist(),
+               'w': np.array(list(np.array(results)[:,0]))[:,3].tolist(),
+               'Hubble': np.array(list(np.array(results)[:,0]))[:,4].tolist(),
                'Ratio': np.array(results)[:,1].tolist()}
 
         with open('data/' + file_name, 'w') as out_file:
