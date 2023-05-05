@@ -3,6 +3,7 @@ import numpy as np
 
 from scipy.integrate import quad
 from scipy.optimize import minimize
+from scipy.interpolate import interp2d
 
 from multiprocessing import Pool
 from functools import partial
@@ -16,7 +17,7 @@ import sys
 """
 params = [Omega Lambda, Omega Matter, Hubble's Constant, w]
 """
-
+#----------------- Mathematical Operations -----------------#
 def cross_product(*linspaces):
     # Create a list to hold the linspaces and their lengths
     linspaces_list = []
@@ -37,6 +38,8 @@ def cross_product(*linspaces):
 
     return cross_product_array
 
+
+#----------------- Cosmological and Statistical Functions -----------------#
 def Dc(z, Omega_l, Omega_m, w):
     Omega_k = 1 - (Omega_l + Omega_m + 9.2e-5)
     def f(z, Omega_l, Omega_m, w):
@@ -71,6 +74,24 @@ def chi2(Omega_l, Omega_m, w, Hubble, df):
 def ratio(Omega_l, Omega_m, w, Hubble, df, chi2null):
     return chi2(Omega_l, Omega_m, w, Hubble, df) - chi2null
 
+
+#----------------- Processing Functions -----------------#
+def _zip_vars(fixed: dict, x) -> dict:
+    keys = ['Omega_l', 'Omega_m', 'w',  'Hubble']
+    variable_parameters = []
+    for param in keys:
+        if param not in list(fixed.keys()):
+            variable_parameters.append(param)
+            
+    _vars = dict(zip(variable_parameters, x))
+    return _vars
+
+def get_values(dct, keys):
+    common_keys = set(keys) & set(dct.keys())
+    filtered_dict = {k: v for k, v in dct.items() if k in common_keys}
+    sorted_values = [filtered_dict[k] for k in keys if k in filtered_dict]
+    return tuple(sorted_values)
+
 def _minimize(args):
 
     dict_kwargs = {
@@ -95,16 +116,6 @@ def _minimize(args):
 
     return values
 
-def _zip_vars(fixed: dict, x) -> dict:
-    full_parameters = ['Omega_l', 'Omega_m', 'w',  'Hubble']
-    variable_parameters = []
-    for param in full_parameters:
-        if param not in list(fixed.keys()):
-            variable_parameters.append(param)
-            
-    _vars = dict(zip(variable_parameters, x))
-    return _vars
-
 def h(x, fixed, df):
     """
     This is a wrapper for the chi2 function. 
@@ -126,10 +137,10 @@ def generate_grid(config, grid_size):
     
     def generate_free_params(config, grid_size):
         standard_x0 = {'Omega_l':0.74, 'Omega_m':0.26, 'w':-1,  'Hubble':70}
-        _linspaces = []
+        linspaces = []
         for free in config['free']:
-            _linspaces.append(np.linspace(config['grid'][free][0], config['grid'][free][1], grid_size))
-        cross = cross_product(*_linspaces)
+            linspaces.append(np.linspace(config['grid'][free][0], config['grid'][free][1], grid_size))
+        cross = cross_product(*linspaces)
         for i in cross:
 
             fixed = {config['free'][j]: i[j] for j in range(len(config['free']))}
@@ -148,7 +159,20 @@ def generate_grid(config, grid_size):
         yield  result
 
 def orchestrator(params, **kwargs):
-    return params, ratio(params[0], params[1], params[2], params[3], kwargs['df'], kwargs['chi2null'])
+
+    result = []
+    
+    keys = ['Omega_l', 'Omega_m', 'w', 'Hubble']
+    params_dict = dict(zip(keys, params))
+
+    common_keys = set(kwargs['free']) & set(params_dict.keys())
+    filtered_dict = {k: v for k, v in params_dict.items() if k in common_keys}
+    sorted_values = [filtered_dict[k] for k in kwargs['free'] if k in filtered_dict]
+
+    _ratio = ratio(params[0], params[1], params[2], params[3], kwargs['df'], kwargs['chi2null'])
+
+    result = sorted_values + [_ratio]
+    return result
     
 if __name__ == '__main__':
 
@@ -163,17 +187,19 @@ if __name__ == '__main__':
 
     df = pd.DataFrame(sample)
     config['df'] = df
-    fixed = {}
+
+    keys = ['Omega_l', 'Omega_m', 'w', 'Hubble']
+    config['free'] = sorted(config['free'], key=lambda k: keys.index(k))
 
     x0 = [0.76, 0.24, -1, 71] #['Omega_l', 'Omega_m', 'w',  'Hubble']
 
-    null = minimize(h, x0 = x0, args = (fixed, df), method = 'Nelder-Mead', tol = 1e-6, bounds = ((0,1), (0,1), (-1.5, 0), (0, None)), options = {'maxiter': 10000})
+    null = minimize(h, x0 = x0, args = ({}, df), method = 'Nelder-Mead', tol = 1e-6, bounds = ((0,1), (0,1), (-1.5, 0), (0, None)), options = {'maxiter': 10000})
     config['minimum'] = null.x
     logging.info(f'Maximum Likelihood Estimators: {null.x}')
 
 
     chi2null = chi2(null.x[0], null.x[1], null.x[2], null.x[3], df)
-    dict_kwargs = {'df': df, 'chi2null': chi2null}
+    config['chi2null'] = chi2null
 
     for grid_size in config['grid_sizes']:
 
@@ -181,27 +207,30 @@ if __name__ == '__main__':
 
         if config['mode'] == 'single':
             results = []
-            #for params in generate_grid(np.linspace(0, 1, grid_size), np.linspace(0, 1, grid_size), [71]):
             for params in generate_grid(config, grid_size):
-                results.append(orchestrator(params, **dict_kwargs))
+                results.append(orchestrator(params, **config))
         elif config['mode'] == 'multi':
             with Pool() as pool:
-                #results = pool.map(partial(orchestrator, **dict_kwargs), generate_grid(np.linspace(0, 1, grid_size), np.linspace(0, 1, grid_size), [71]))
-                results = pool.map(partial(orchestrator, **dict_kwargs), generate_grid(config, grid_size))
+                results = pool.map(partial(orchestrator, **config), generate_grid(config, grid_size))
                 pool.close()
                 pool.join()
 
         end = time.time()
-        file_name = str(grid_size) + '_' +  config['free'][0] + '_' + config['free'][1] + '_' + 'likelihood_ratio.json'
+
+        name = ''
+        for free_params in config['free']:
+            name += f'_{free_params}'
+        file_name = str(grid_size) + name + '_likelihood_ratio.json'
+
         logging.info(f'Grid with length {grid_size} calculated in {end-start} seconds')
         logging.info(f'Saving calculation in the file {file_name}')
 
-        # Brace yourself for some terrible coding!!! ლ(ಠ益ಠლ)
-        out = {'Omega_l': np.array(list(np.array(results)[:,0]))[:,0].tolist(),
-               'Omega_m': np.array(list(np.array(results)[:,0]))[:,1].tolist(),
-               'w': np.array(list(np.array(results)[:,0]))[:,2].tolist(),
-               'Hubble': np.array(list(np.array(results)[:,0]))[:,3].tolist(),
-               'Ratio': np.array(results)[:,1].tolist()}
+        results_array = np.array(results)
+        
+        out = {value: column for value, column in zip(config['free'] + ['Ratio'], results_array.T)}
+        out = {key: value.tolist() for key, value in out.items()}
+        
+        # f = interp2d(results_array[:,0], results_array[:,1], results_array[:,2], kind =)
 
         with open('data/' + file_name, 'w') as out_file:
             json.dump(out, out_file)
