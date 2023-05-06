@@ -18,7 +18,24 @@ import sys
 params = [Omega Lambda, Omega Matter, Hubble's Constant, w]
 """
 #----------------- Mathematical Operations -----------------#
-def cross_product(*linspaces):
+def cartesian_product(*linspaces):
+    """
+    Compute the cartesian product of a set of one-dimensional arrays.
+
+    Given n one-dimensional arrays, this function returns an array of shape (N, n), where
+    N is the product of the lengths of the input arrays. The resulting array is obtained 
+    by taking the Cartesian product of the input arrays, with the first array varying 
+    fastest and the last array varying slowest.
+
+    Args:
+        *linspaces: One or more one-dimensional arrays to be used in the cartesian product.
+
+    Returns:
+        A 2D numpy array of shape (N, n), where N is the product of the lengths of the 
+        input arrays, and n is the number of input arrays. The i-th row of the array 
+        contains the i-th combination of values from the input arrays.
+    """
+    
     # Create a list to hold the linspaces and their lengths
     linspaces_list = []
     lengths = []
@@ -28,26 +45,85 @@ def cross_product(*linspaces):
         linspaces_list.append(linspace)
         lengths.append(len(linspace))
 
-    # Create a 2D array to hold the cross product
-    cross_product_array = np.zeros((np.prod(lengths), len(linspaces)))
+    # Create a 2D array to hold the cartesian product
+    cartesian_product_array = np.zeros((np.prod(lengths), len(linspaces)))
 
-    # Loop through each value in the linspaces and add it to the cross product array
+    # Loop through each value in the linspaces and add it to the cartesian product array
     for i in range(len(linspaces)):
         repeat = np.prod(lengths[i+1:])
-        cross_product_array[:, i] = np.tile(np.repeat(linspaces[i], repeat), np.prod(lengths[:i]))
+        cartesian_product_array[:, i] = np.tile(np.repeat(linspaces[i], repeat), np.prod(lengths[:i]))
 
-    return cross_product_array
+    return cartesian_product_array
 
 
 #----------------- Cosmological and Statistical Functions -----------------#
-def Dc(z, Omega_l, Omega_m, w):
-    Omega_k = 1 - (Omega_l + Omega_m + 9.2e-5)
-    def f(z, Omega_l, Omega_m, w):
-        return (np.sqrt(Omega_l*(1 + z)**(-3 - 3*w) + Omega_m*(1 + z)**3 + Omega_k*(1 + z)**2 + 9.2e-5*(1 + z)**4))**(-1)
-    return quad(f, 0, z, args = (Omega_l, Omega_m, w))[0]
+def Dc(z: float, Omega_l: float, Omega_m: float, w: float) -> float:
+    """
+    Calculates the adimensional comoving distance using the input parameters.
 
-def Dt(z, Omega_l, Omega_m, w):
+    Parameters:
+        z (float): The redshift value.
+        Omega_l (float): The value of the cosmological constant.
+        Omega_m (float): The value of the matter density parameter.
+        w (float): The value of the dark energy equation of state.
+
+    Returns:
+        The adimensional comoving distance.
+        
+    Notes:
+        The adimensional comoving distance is the distance that would be traveled 
+        by a photon emitted at redshift z, if the universe were not expanding, 
+        divided by the Hubble distance. This function calculates the comoving 
+        distance by performing a numerical integration of the function f(z, Omega_l, 
+        Omega_m, w) over the redshift range [0, z], where f(z, Omega_l, Omega_m, w) 
+        is defined as:
+
+        f(z, Omega_l, Omega_m, w) = 1 / sqrt(Omega_l*(1 + z)**(3 + 3*w) + 
+                                              Omega_m*(1 + z)**3 + 
+                                              Omega_k*(1 + z)**2 + 
+                                              9.2e-5*(1 + z)**4)
+
+        where Omega_k = 1 - (Omega_l + Omega_m + 9.2e-5) represents the curvature of 
+        the universe. The result is returned as an adimensional quantity, which 
+        can be converted to physical units of length by multiplying by the Hubble 
+        distance.
+    """
+    
     Omega_k = 1 - (Omega_l + Omega_m + 9.2e-5)
+
+    def f(z, Omega_l, Omega_m, w):
+        return 1/(np.sqrt(Omega_l*(1 + z)**(3 + 3*w) + Omega_m*(1 + z)**3 + Omega_k*(1 + z)**2 + 9.2e-5*(1 + z)**4))
+    
+    result = quad(f, 0, z, args = (Omega_l, Omega_m, w))[0]
+
+    return result
+
+def Dt(z: float, Omega_l: float, Omega_m: float, w: float) -> float:
+    """
+    Calculates the temporal comoving distance using the input parameters.
+
+    Parameters:
+        z (float): The redshift value.
+        Omega_l (float): The value of the cosmological constant.
+        Omega_m (float): The value of the matter density parameter.
+        w (float): The value of the dark energy equation of state.
+
+    Returns:
+        The temporal comoving distance.
+        
+    Notes:  
+        -If Omega_k is greater than 0, the universe is positively curved like a 
+        sphere, and the correction factor involves a sine function.
+
+        -If Omega_k is equal to 0, the universe is flat, and no correction factor 
+        is necessary.
+
+        -If Omega_k is less than 0, the universe is negatively curved like a saddle, 
+        and the correction factor involves a hyperbolic sine function.
+    """
+    
+    Omega_k = 1 - (Omega_l + Omega_m + 9.2e-5) # Omega_l + Omega_m + Omega_r + Omega_k = 1
+    
     if Omega_k > 0:
         return np.sin(np.sqrt(Omega_k)*Dc(z, Omega_l, Omega_m, w))/np.sqrt(Omega_k)
     elif Omega_k == 0:
@@ -55,28 +131,120 @@ def Dt(z, Omega_l, Omega_m, w):
     elif Omega_k:
         return np.sinh(np.sqrt(abs(Omega_k))*Dc(z, Omega_l, Omega_m, w))/np.sqrt(abs(Omega_k))
 
-def Dl(z, Omega_l, Omega_m, w):
+def Dl(z: float, Omega_l: float, Omega_m: float, w: float) -> float:
+    """
+    Calculates the luminosity distance using the input parameters.
+
+    Parameters:
+        z (float): The redshift value.
+        Omega_l (float): The value of the cosmological constant.
+        Omega_m (float): The value of the matter density parameter.
+        w (float): The value of the dark energy equation of state.
+
+    Returns:
+        The luminosity distance.
+    """
+    
     return (1 + z) * Dt(z, Omega_l, Omega_m, w)
                
-def mu(z, Omega_l, Omega_m, w, Hubble):
+def mu(z: float, Omega_l: float, Omega_m: float, w: float, Hubble: float) -> float:
+    """
+    Calculates the distance modulus using the input parameters.
+
+    Parameters:
+        z (float): The redshift value.
+        Omega_l (float): The value of the cosmological constant.
+        Omega_m (float): The value of the matter density parameter.
+        w (float): The value of the dark energy equation of state.
+        Hubble (float): The Hubble parameter.
+
+    Returns:
+        The distance modulus.
+    """
+    
     c = 3e5 #(km/s)
     return 5*np.log10(Dl(z, Omega_l, Omega_m, w)) + 25 + 5*np.log10(c/ Hubble)
 
-def chi2_i(mu_o, sigma_o, z_obs, Omega_l, Omega_m, w, Hubble):
-    return ((mu(z_obs, Omega_l, Omega_m, w, Hubble) - mu_o)**2)/sigma_o**2
+def chi2_i(mu_o: float, sigma_o: float, z_obs: float, Omega_l: float, Omega_m: float, w: float, Hubble: float) -> float:
+    """
+    Calculates the chi-squared value for a single data point using the input parameters.
 
-def chi2(Omega_l, Omega_m, w, Hubble, df): 
+    Parameters:
+        mu_o (float): The observed distance modulus.
+        sigma_o (float): The uncertainty in the observed distance modulus.
+        z_obs (float): The observed redshift value.
+        Omega_l (float): The value of the cosmological constant.
+        Omega_m (float): The value of the matter density parameter.
+        w (float): The value of the dark energy equation of state.
+        Hubble (float): The Hubble parameter.
+
+    Returns:
+        The chi-squared value for a single data point.
+    """
+    
+    _mu = mu(z_obs, Omega_l, Omega_m, w, Hubble)
+    return ((_mu - mu_o)**2)/sigma_o**2
+
+def chi2(Omega_l: float, Omega_m: float, w: float, Hubble: float, df): 
+    """
+    Calculates the chi-squared value for a set of data points using the input parameters.
+
+    Parameters:
+        Omega_l (float): The value of the cosmological constant.
+        Omega_m (float): The value of the matter density parameter.
+        w (float): The value of the dark energy equation of state.
+        Hubble (float): The Hubble parameter.
+        df (pandas.DataFrame): The dataframe containing the observed redshift values, distance moduli, and uncertainties.
+
+    Returns:
+        The chi-squared value for the set of data points.
+    """
     values = []
     for idx in df.index:
         values.append(chi2_i(df.mu[idx], df.sigma[idx], df.z[idx], Omega_l, Omega_m, w, Hubble))
-    return sum(values)
+    result = sum(values)
+    return result
 
-def ratio(Omega_l, Omega_m, w, Hubble, df, chi2null):
+def ratio(Omega_l: float, Omega_m: float, w: float, Hubble: float, df, chi2null: float) -> float:
+    """
+    Calculates the likelihood ratio test statistic for a given set of cosmological
+    parameters and data.
+
+    Parameters:
+        Omega_l (float): The cosmological constant.
+        Omega_m (float): The density of matter.
+        w (float): The dark energy equation of state parameter.
+        Hubble (float): The Hubble constant in units of km/s/Mpc.
+        df (pandas.DataFrame): A DataFrame with columns for redshift (z), observed
+            distance modulus (mu_o), and uncertainty (sigma_o).
+        chi2null (float): The chi-squared value for the null model, i.e., the chi-
+            squared value for the observed data using the values of the cosmological
+            parameters in the null hypothesis.
+
+    Returns:
+        float: The difference in chi-squared values between the null and alternative
+            models.
+    """
+    
     return chi2(Omega_l, Omega_m, w, Hubble, df) - chi2null
 
 
 #----------------- Processing Functions -----------------#
 def _zip_vars(fixed: dict, x) -> dict:
+    """
+    Given a dictionary of fixed parameters and an array of values, this function creates 
+    an ordered dictionary estimating the position of each value in the array for the 
+    remaining unfixed parameters (in the order Omega_l, Omega_m, w, and Hubble). 
+
+    Args:
+        fixed (dict): A dictionary of fixed parameters.
+        x: An array of values with length equal to the number of unfixed parameters.
+
+    Returns:
+        A dictionary with keys corresponding to unfixed parameters and values corresponding 
+        to the corresponding values in x.
+    """
+    
     keys = ['Omega_l', 'Omega_m', 'w',  'Hubble']
     variable_parameters = []
     for param in keys:
@@ -93,6 +261,15 @@ def get_values(dct, keys):
     return tuple(sorted_values)
 
 def _minimize(args):
+    """
+    Minimizes the given function h using the Nelder-Mead method and returns the optimal value of x.
+
+    Parameters:
+        args (tuple): A tuple containing the values of the arguments to be passed to the function h.
+
+    Returns:
+        x (array): The optimal value of x that minimizes the function h.
+    """
 
     dict_kwargs = {
         'fun': h,
@@ -116,32 +293,46 @@ def _minimize(args):
 
     return values
 
-def h(x, fixed, df):
+def h(x, fixed: dict, df) -> float:
     """
-    This is a wrapper for the chi2 function. 
-    A workaround to the fact that scipy.optimize.minimize uses positional arguments
-    
-        Given a dict of fixed variables, this fuction enables minimize to pass an array of arguments
+    A wrapper for the chi2 function that enables minimize to pass an array of arguments 
+    by creating a dictionary of variables to be optimized. 
+
+    Args:
+        x: An array of values to be optimized.
+        fixed (dict): A dictionary of fixed variables.
+        df: A pandas dataframe containing the data to be fitted.
+
+    Returns:
+        The value of the chi-squared function for the given parameters.
     """
     
-     # Creates dictionary of variables to be optimized
+    # Creates dictionary of variables to be optimized
     _vars = _zip_vars(fixed, x)
 
-    # fixed['df'] = df
-    g = partial(chi2, df = df, **fixed) # Creates partial function fixing variables set by `fixed`
-        
+    g = partial(chi2, df=df, **fixed) # Creates partial function fixing variables set by `fixed`
     # Unzips `_vars` as named args to `g`
     return g(**_vars) 
 
 def generate_grid(config, grid_size):
-    
+    """
+    Generates a grid of values for the given configuration and grid size, and finds the optimal values of the free parameters
+    using the _minimize function.
+
+    Parameters:
+        config (dict): A dictionary containing the configuration for the grid search.
+        grid_size (int): The size of the grid to be generated.
+
+    Yields:
+        result (tuple): The optimal value of x that minimizes the function h for the current set of free parameters.
+    """    
     def generate_free_params(config, grid_size):
         standard_x0 = {'Omega_l':0.74, 'Omega_m':0.26, 'w':-1,  'Hubble':70}
         linspaces = []
         for free in config['free']:
             linspaces.append(np.linspace(config['grid'][free][0], config['grid'][free][1], grid_size))
-        cross = cross_product(*linspaces)
-        for i in cross:
+        cartesian = cartesian_product(*linspaces)
+        for i in cartesian:
 
             fixed = {config['free'][j]: i[j] for j in range(len(config['free']))}
             dict1 = {key: value for key, value in standard_x0.items() if key not in fixed}

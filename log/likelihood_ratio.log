@@ -240,3 +240,11 @@ INFO:root:Maximum Likelihood Estimators: [ 0.56166106  0.         -0.89896453 70
 INFO:root:Execution 2023-05-01 20:37:23.009305
 INFO:root:Script running with following configuration: {'mode': 'multi', 'sample_path': 'data/snls_snia.json', 'free': ['Hubble', 'Omega_l'], 'minimization_seed': [0.26, -1], 'grid': {'Omega_l': [0, 2], 'Hubble': [0, 100]}, 'grid_sizes': [100]}
 INFO:root:Maximum Likelihood Estimators: [ 0.56166106  0.         -0.89896453 70.15611471]
+INFO:root:Execution 2023-05-05 19:26:15.272107
+INFO:root:Script running with following configuration: {'mode': 'multi', 'sample_path': 'data/snls_snia.json', 'free': ['Hubble', 'Omega_l'], 'minimization_seed': [-1, 71], 'grid': {'Omega_l': [0, 2], 'Omega_m': [0, 2]}, 'grid_sizes': [4]}
+INFO:root:Maximum Likelihood Estimators: [ 0.5616612   0.         -1.10103514 70.15611476]
+INFO:root:Execution 2023-05-06 14:51:11.134432
+INFO:root:Script running with following configuration: {'mode': 'multi', 'sample_path': 'data/snls_snia.json', 'free': ['Omega_m', 'Omega_l'], 'minimization_seed': [-1, 71], 'grid': {'Omega_l': [0, 2], 'Omega_m': [0, 2]}, 'grid_sizes': [4]}
+INFO:root:Maximum Likelihood Estimators: [ 0.5616612   0.         -1.10103514 70.15611476]
+INFO:root:Grid with length 4 calculated in 47.09639000892639 seconds
+INFO:root:Saving calculation in the file 4_Omega_l_Omega_m_likelihood_ratio.json
